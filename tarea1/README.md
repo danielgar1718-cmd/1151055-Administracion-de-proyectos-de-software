@@ -70,6 +70,46 @@ Ante el temor de auditorías y costes inesperados, la comunidad y los grandes pr
 ¿Qué licencia tenía el proyecto?
 El lenguaje Java y las especificaciones base se desarrollan bajo el proyecto de código abierto OpenJDK, el cual está licenciado bajo la Licencia Pública General de GNU, versión 2, con la Excepción de Classpath (GPLv2 + CPE).
 
+Ejercicio 3. De PostgreSQL 17 a 18
+
+1. Diferencias entre los dos contenedores
+
+| Qué decía (PostgreSQL 17) | Qué dice (PostgreSQL 18) | Por qué cambió |
+| :--- | :--- | :--- |
+| **Archivo:** `docker-compose.yml` | **Archivo:** `compose.yaml` | `compose.yaml` es el nombre estándar y recomendado por la Compose Specification moderna (Compose V2). |
+| **Construcción:** `image: postgres:17` | **Construcción:** `build: .` e `image: postgres-1151055:26o` | En la v17 se bajaba la imagen oficial directa. En la v18 se construye una imagen personalizada local usando el Dockerfile (para instalar nano, less, etc.) y se le asigna un nombre propio. |
+| **Volúmenes:** `./data:/var/lib/postgresql/data` | **Volúmenes:** `datos_db:/var/lib/postgresql` | Hubo dos cambios: 1) Postgres 18 cambió su ruta interna de datos. 2) Se pasó de usar un "bind mount" (carpeta local `./data`) a un volumen administrado por Docker (`datos_db`). |
+| **Variables:** Valores fijos (ej. `POSTGRES_DB: postgres`) | **Variables:** Valores por defecto (ej. `${POSTGRES_DB:-proyecto}`) | La sintaxis `:-` permite que el contenedor levante con un valor por defecto si no existe un archivo `.env`, haciéndolo más flexible. |
+| **Salud:** No tenía configuración de salud. | **Salud:** Bloque `healthcheck` con `pg_isready`. | Sirve para que Docker sepa exactamente cuándo la base de datos está lista para recibir conexiones por la red. |
+| **Servicios:** Solo existía el servicio `postgres`. | **Servicios:** Se añadió el servicio `adminer`. | Se agregó una interfaz gráfica web ligera que depende de que la base de datos esté "healthy" para poder iniciar. |
+
+2. ¿Se usaba el Dockerfile viejo?
+No, no se usaba.** Aunque el archivo `Dockerfile` existía físicamente en la carpeta de la versión 17, si revisamos el archivo `docker-compose.yml` viejo, el servicio de base de datos solo tenía la instrucción `image: postgres:17`. Al no incluir la instrucción `build: .` (que es la que le ordena a Compose leer el Dockerfile), Docker ignoró ese archivo por completo y simplemente descargó la imagen oficial ya hecha desde Docker Hub.
+
+3. Versionado semántico y el salto a la 18
+El versionado semántico es una convención para numerar el software usando tres números: `MAYOR.MENOR.PARCHE`. 
+Pasar de la versión 17 a la 18 representa un **cambio MAYOR**. En el versionado semántico, cuando el primer número cambia, significa que se introdujeron modificaciones drásticas que rompen la compatibilidad con versiones anteriores (*breaking changes*). En el caso de PostgreSQL, un cambio mayor implica que la estructura interna en la que se guardan los archivos de la base de datos cambia; por eso, el contenedor de la versión 18 no puede leer los datos (el volumen) que había guardado la versión 17 sin hacer antes una migración manual.
+
+Ejercicio 4
+
+1. Tabla comparativa: PostgreSQL + Adminer frente a MySQL + phpMyAdmin
+
+| Característica | PostgreSQL + Adminer | MySQL + phpMyAdmin |
+| :--- | :--- | :--- |
+| **Motor de Base de Datos** | **PostgreSQL:** Sistema objeto-relacional muy estricto con el estándar SQL. Ideal para transacciones complejas, integridad de datos rígida y analítica. | **MySQL:** Sistema relacional tradicionalmente enfocado en la velocidad de lectura. Es la base histórica de una gran parte de la web (stack LAMP). |
+| **Interfaz Web** | **Adminer:** Herramienta ultraligera (un solo archivo PHP). Su interfaz es minimalista y permite conectarse a múltiples motores de bases de datos, no solo PostgreSQL. | **phpMyAdmin:** Herramienta pesada y robusta, exclusiva para gestionar MySQL y MariaDB. Ofrece una interfaz gráfica con múltiples asistentes y opciones visuales. |
+
+2. Versiones LTS, Innovation y el uso de etiquetas específicas
+Versión LTS (Long Term Support): Son versiones enfocadas en la estabilidad a largo plazo. No reciben nuevas funciones experimentales, pero garantizan parches de seguridad y correcciones de errores durante años. Son el estándar para entornos de producción.
+Versión Innovation: Son versiones que se liberan con frecuencia para introducir las características y tecnologías más recientes. Su ciclo de vida oficial es corto, obligando a los equipos a actualizar constantemente.
+
+¿Por qué se usa `mysql:9.7.2` y no `mysql:latest`?
+Usar la etiqueta `latest` es una mala práctica en la administración de proyectos de software porque rompe la reproducibilidad. La etiqueta `latest` es un puntero móvil: hoy puede descargar la versión 8, pero si mañana sale la versión 9 (con cambios mayores que rompen la compatibilidad), el sistema la descargará automáticamente y la aplicación dejará de funcionar. 
+
+Al fijar la versión exacta (`9.7.2`), se garantiza que el entorno de desarrollo sea predecible e idéntico para cualquier persona del equipo que levante el contenedor, sin importar en qué año lo haga.
+
+Para la elaboración de este documento, se utilizó inteligencia artificial (Gemini) como asistente de apoyo para el formateo de las tablas en Markdown y la revisión de estilo en la redacción de los textos.
+
 Bibliografia:
 Chacon, S., & Straub, B. (2014). *Pro Git* (2a ed.). Apress.
 Free Software Foundation. (2021). *What is free software?*. The GNU Operating System. https://www.gnu.org/philosophy/free-sw.html
